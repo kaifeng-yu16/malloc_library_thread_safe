@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-O3 -fPIC
+CFLAGS=-O3 -fPIC -Wall -Werror
 DEPS=my_malloc.h
 
 all: lib
