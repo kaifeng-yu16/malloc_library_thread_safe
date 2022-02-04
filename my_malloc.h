@@ -25,10 +25,6 @@ void ts_free_lock(void *ptr);
 void *ts_malloc_nolock(size_t size);
 void ts_free_nolock(void *ptr);
 
-// functions for performance study
-unsigned long get_data_segment_size(); // in bytes
-unsigned long get_data_segment_free_space_size(); // in bytes
-
 // functions used for implementing malloc
 void * f_malloc(size_t size, meta_data_t** free_list_head, meta_data_t** free_list_tail, int has_lock);
 

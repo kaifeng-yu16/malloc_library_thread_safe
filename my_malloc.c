@@ -6,9 +6,7 @@ __thread meta_data_t * free_list_head_nolock = NULL;
 __thread meta_data_t * free_list_tail_nolock = NULL;
 pthread_mutex_t mut = PTHREAD_MUTEX_INITIALIZER;
 
-unsigned long segment_size = 0;
-unsigned long segment_free_space_size = 0;
-
+// multi_thread malloc function: lock version
 void *ts_malloc_lock(size_t size) {
     pthread_mutex_lock(&mut);
     void * ret = f_malloc(size, &free_list_head_lock, &free_list_tail_lock, 1);
@@ -16,36 +14,27 @@ void *ts_malloc_lock(size_t size) {
     return ret;
 }
 
+// multi_thread free function: lock version
 void ts_free_lock(void *ptr) {
     pthread_mutex_lock(&mut);
     f_free(ptr, &free_list_head_lock, &free_list_tail_lock);
     pthread_mutex_unlock(&mut);
 }
 
+// multi_thread malloc function: nolock version
 void *ts_malloc_nolock(size_t size) {
     return f_malloc(size, &free_list_head_nolock, &free_list_tail_nolock, 0);
 }
 
+// multi_thread free function: nolock version
 void ts_free_nolock(void *ptr) {
     f_free(ptr, &free_list_head_nolock, &free_list_tail_nolock);
 }
 
-// function for performance study
-unsigned long get_data_segment_size() { // in bytes
-  return segment_size;
-}
-
-// function for performance study
-unsigned long get_data_segment_free_space_size() { // in bytes
-  return segment_free_space_size;
-}
-
-// malloc funtion that can be used by both FF and BF
+// malloc funtion 
 // size: input, the size that need to be malloc
 // f: a function used to find appropriate free block
 void * f_malloc(size_t size, meta_data_t** free_list_head, meta_data_t** free_list_tail, int has_lock) {
-  //printf("enter f_malloc :size = %lu\n", size);
-  //print_free_list(free_list_head);
   if (size == 0) {
     return NULL;
   }
@@ -60,8 +49,6 @@ void * f_malloc(size_t size, meta_data_t** free_list_head, meta_data_t** free_li
     }
   }
   assert(((meta_data_t *)addr)->is_used == 1);
-  //printf("at the end of fmalloc: size = %lu\n", size);
-  //print_free_list(free_list_head);
   return addr + sizeof(meta_data_t);
 }
 
@@ -95,10 +82,6 @@ meta_data_t * find_existed_block(size_t size, meta_data_t** free_list_head) {
   size_t min = SIZE_MAX;
   meta_data_t * min_ptr = NULL;
   while (ptr != NULL) {
-    if (ptr->is_used != 0) {
-      print_block(ptr);
-      print_free_list(free_list_head);
-    }
     assert(ptr->is_used == 0);
     if(ptr->size == size) {
       return ptr;
@@ -131,14 +114,12 @@ void * add_new_block(size_t size, int has_lock) {
   block_meta->prev_free_block = NULL;
   block_meta->next_free_block = NULL;
   
-  segment_size += (size + sizeof(meta_data_t));
   return ptr;
 }
 
 // free funtion that can be used by both FF and BF
 // ptr: input, the ptr that needs to be freed
 void f_free(void * ptr, meta_data_t** free_list_head, meta_data_t** free_list_tail) {
-  //printf("enter f_free: ptr = %lu\n", (unsigned long int) ptr);
   if (ptr == NULL) {
     return;
   }
@@ -177,7 +158,6 @@ void try_coalesce(meta_data_t * block, meta_data_t** free_list_tail) {
     }
     block->prev_free_block->next_free_block = block->next_free_block;
   }
-  //print_free_list(&free_list_head_lock);
 }
 
 // add a block to free list
@@ -202,7 +182,6 @@ void add_to_free_list(meta_data_t * block, meta_data_t** free_list_head, meta_da
     *free_list_tail = block;
   }
   (*ptr) = block;
-  segment_free_space_size += block->size + sizeof(meta_data_t);
 }
 
 // remove a block from free list
@@ -222,7 +201,6 @@ void remove_block(meta_data_t * block, meta_data_t** free_list_head, meta_data_t
   }
   block->prev_free_block = NULL;
   block->next_free_block = NULL;
-  segment_free_space_size -= block->size + sizeof(meta_data_t);
 }
 
 // split an unused block into two, use the first one
@@ -251,7 +229,6 @@ void split_block(meta_data_t * block1, size_t size, meta_data_t** free_list_head
   block1->size = size;
   block1->prev_free_block = NULL;
   block1->next_free_block = NULL;
-  segment_free_space_size -= (size + sizeof(meta_data_t));
 }
 
 // print free list
